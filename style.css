@@ -89,3 +89,60 @@ button.link { border: none; background: none; color: var(--accent); padding: 4px
   background: var(--bg); padding: 10px; border-radius: 8px; margin: 0 0 10px;
 }
 footer { text-align: center; padding: 8px 0; }
+
+/* ---- 演出 ---- */
+.avatar { animation: idle 2.4s ease-in-out infinite; display: inline-block; }
+.avatar.jump { animation: jump .6s cubic-bezier(.3,1.6,.5,1); }
+.boss-icon { display: inline-block; animation: hover 1.8s ease-in-out infinite; }
+.boss-icon.hit { animation: hit .45s ease; }
+.boss-icon.defeated { animation: defeated 1s ease forwards; }
+@keyframes idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes hover { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
+@keyframes jump {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-22px) scale(1.15, .9); }
+  60% { transform: translateY(0) scale(.9, 1.1); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes hit {
+  0%, 100% { transform: translateX(0); filter: none; }
+  20% { transform: translateX(-8px) rotate(-8deg); filter: brightness(2) saturate(0); }
+  40% { transform: translateX(8px) rotate(8deg); }
+  60% { transform: translateX(-5px); filter: brightness(2) saturate(0); }
+  80% { transform: translateX(4px); }
+}
+@keyframes defeated {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.4) rotate(-10deg); filter: brightness(3); }
+  100% { transform: scale(0) rotate(360deg); opacity: 0; }
+}
+.fill { transition: width .8s cubic-bezier(.2,.8,.3,1); }
+.day.done .dot { animation: pop .4s ease; }
+@keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+#fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
+.fx-float { position: fixed; font-weight: 900; font-size: 22px; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.fx-float.xp { color: #f6c23b; }
+.fx-float.dmg { color: var(--bad); font-size: 26px; }
+.fx-shot, .fx-particle { position: fixed; font-size: 28px; }
+.fx-particle { font-size: 18px; }
+.fx-confetti { position: fixed; top: 0; width: 8px; height: 12px; border-radius: 2px; }
+.fx-banner {
+  position: fixed; inset: 0; display: grid; place-items: center; pointer-events: auto;
+  background: rgba(10, 14, 25, .55); animation: fade .25s ease;
+}
+.fx-banner.out { opacity: 0; transition: opacity .3s; }
+.fx-banner-box {
+  background: var(--card); border-radius: 20px; padding: 24px 32px; text-align: center;
+  animation: zoom .5s cubic-bezier(.3,1.6,.5,1); box-shadow: 0 10px 40px rgba(0,0,0,.3);
+}
+.fx-banner-icon { font-size: 64px; animation: spin 1s ease; }
+.fx-banner-title { font-size: 28px; font-weight: 900; color: var(--accent); margin-top: 6px; }
+.fx-banner-sub { color: var(--muted); margin-top: 4px; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes zoom { from { transform: scale(.3); opacity: 0; } }
+@keyframes spin { from { transform: rotate(-360deg) scale(.3); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar, .boss-icon { animation: none; }
+}

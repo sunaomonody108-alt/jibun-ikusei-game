@@ -2,6 +2,7 @@ import {
   ACTIVITIES, STATS, MINI_XP, BOSS_HP, activityById, xpForLog,
   dateKey, overall, levelFromXp,
 } from "./game.js";
+import { floatText, pulse, attack, banner, countTo } from "./fx.js";
 
 const STORE_KEY = "jibun-game-v1";
 const AVATARS = ["🧑", "🧑‍🎓", "🏃", "🧙", "🦸"]; // レベルで見た目が変わる
@@ -30,9 +31,32 @@ function todayKey() {
 }
 
 function addLog(log) {
+  const before = render();
   state.logs.push({ ...log, id: Date.now() + Math.random(), date: todayKey() });
   save();
-  render();
+  const after = render();
+  celebrate(before, after);
+}
+
+// 記録したときの演出
+function celebrate(before, after) {
+  const gain = after.net - before.net;
+  const avatar = $("avatar");
+  pulse(avatar, "jump");
+  floatText(avatar, `+${gain}XP`, "xp");
+  const dmg = before.hp - after.hp;
+  if (dmg > 0) {
+    attack(avatar, $("bossicon"), () => {
+      pulse($("bossicon"), after.hp === 0 ? "defeated" : "hit");
+      floatText($("bossicon"), `-${dmg}`, "dmg");
+    });
+  }
+  // 重なったときは順番に見せる
+  const queue = [];
+  if (!before.done && after.done) queue.push(["今日の最低ライン達成", "この調子でいこう", "🔥"]);
+  if (after.level > before.level) queue.push(["LEVEL UP!", `Lv.${before.level} → Lv.${after.level}`, avatar.textContent]);
+  if (before.hp > 0 && after.hp === 0) queue.push(["ボス撃破！", "今週のボスに勝ちました", "🏆"]);
+  queue.forEach((args, i) => setTimeout(() => banner(...args), 900 + i * 2900));
 }
 
 function removeLog(id) {
@@ -88,7 +112,7 @@ function render() {
   state.maxLevel = Math.max(state.maxLevel || 1, lv.level);
   save();
   const shownLevel = state.maxLevel;
-  $("level").textContent = shownLevel;
+  countTo($("level"), shownLevel);
   $("name").textContent = state.name;
   $("avatar").textContent = AVATARS[Math.min(AVATARS.length - 1, Math.floor((shownLevel - 1) / 5))];
   const pct = shownLevel > lv.level ? 0 : Math.round((lv.into / lv.need) * 100);
@@ -121,12 +145,20 @@ function render() {
 
   // 能力
   const maxStat = Math.max(50, ...STATS.map((s) => o.stats[s.id]));
-  $("stats").innerHTML = STATS.map((s) => `
-    <div class="stat">
-      <span>${s.name}</span>
-      <div class="bar"><div class="fill" style="width:${Math.round((o.stats[s.id] / maxStat) * 100)}%"></div></div>
-      <span class="num">${o.stats[s.id]}</span>
-    </div>`).join("");
+  if (!$("stats").children.length) {
+    $("stats").innerHTML = STATS.map((s) => `
+      <div class="stat" id="stat-${s.id}">
+        <span>${s.name}</span>
+        <div class="bar"><div class="fill"></div></div>
+        <span class="num"></span>
+      </div>`).join("");
+  }
+  // 要素を作り直さずに値だけ変え、バーが伸びるようにする
+  for (const s of STATS) {
+    const row = $(`stat-${s.id}`);
+    row.querySelector(".fill").style.width = Math.round((o.stats[s.id] / maxStat) * 100) + "%";
+    countTo(row.querySelector(".num"), o.stats[s.id]);
+  }
 
   // 今日の記録
   const todayLogs = state.logs.filter((l) => l.date === today);
@@ -156,6 +188,8 @@ function render() {
     ...byAct,
     hp === 0 ? "ボス撃破！" : `ボス残りHP ${hp}`,
   ].join("\n");
+
+  return { level: shownLevel, hp, net: w.net, done: todayDone };
 }
 
 $("logform").onsubmit = (e) => {
