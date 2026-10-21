@@ -1,5 +1,5 @@
 import {
-  STATS, KINDS, MINI_XP, activityById, allActivities, setCustomActivities, xpForLog,
+  STATS, KINDS, MINI_XP, BALANCE_BONUS, dayBalance, activityById, allActivities, setCustomActivities, xpForLog,
   dateKey, overall, levelFromXp,
 } from "./game.js";
 import { PROLOGUE, BOSSES, chapterOf, fragmentQuestion } from "./story.js";
@@ -79,7 +79,7 @@ function render() {
   const names = ["月", "火", "水", "木", "金", "土", "日"];
   $("week").innerHTML = names.map((n, i) => {
     const d = w.days[i];
-    const cls = !d ? "future" : d.done ? "done" : d.missed ? "missed" : "pending";
+    const cls = !d ? "future" : d.balanced ? "done balanced" : d.done ? "done" : d.missed ? "missed" : "pending";
     return `<span class="day ${cls}" title="${n}"></span>`;
   }).join("");
 
@@ -95,17 +95,22 @@ function render() {
   bar.style.width = Math.round(ratio * 100) + "%";
   bar.className = "hp-fill " + (ratio > 0.5 ? "high" : ratio > 0.2 ? "mid" : "low");
 
-  const todayDone = state.logs.some((l) => l.date === today);
+  const todayLogs = state.logs.filter((l) => l.date === today);
+  const todayDone = todayLogs.length > 0;
+  const bal = dayBalance(todayLogs);
+  $("balance").innerHTML = STATS.map((x) => `<span class="bal${bal.done.has(x.id) ? " on" : ""}">${x.name}</span>`).join("");
+  $("balance").classList.toggle("all", bal.balanced);
   // 取りもどした記憶のかけらの数（今週のボスを倒していれば、その分も入る）
   const fragments = o.bossesDefeated + (hp === 0 ? 1 : 0);
-  return { level: shownLevel, hp, net: w.net, done: todayDone, w, o, boss, fragments };
+  return { level: shownLevel, hp, net: w.net, done: todayDone, bal, todayLogs, w, o, boss, fragments };
 }
 
 function idleText(s) {
   if (s.hp === 0) return `${s.boss.name}は たおした！ 今週は もう勝っている。`;
   if (s.w.debtLeft > 0) return `とりかえしチャンス！ 次の行動は 2倍。（あと${s.w.debtLeft}）`;
   if (!s.done) return `${state.name}は どうする？ （2分だけでも OK）`;
-  return `${state.name}は どうする？`;
+  if (!s.bal.balanced) return `${state.name}は どうする？ （まだ: ${s.bal.missing.map((x) => x.name).join("・")}）`;
+  return `${state.name}は どうする？ 今日は ぜんぶ そろった！`;
 }
 
 // ---- コマンドメニュー ----
@@ -142,10 +147,13 @@ function mainButtons() {
 
 // 行動＝わざ
 function moveMenu(mini) {
-  sayNow(mini ? "どの行動を 2分だけ やった？" : "どの わざを つかう？");
+  const s = render();
+  const used = new Set(s.todayLogs.filter((l) => !l.mini).map((l) => l.activity));
+  sayNow(mini ? "どの行動を 2分だけ やった？" : s.bal.balanced ? "どの わざを つかう？" : `どの わざを つかう？ （まだ: ${s.bal.missing.map((x) => x.name).join("・")}）`);
   menu([
     ...allActivities().map((a) => ({
-      label: escapeHtml(a.name),
+      label: (used.has(a.id) ? "✓ " : "") + escapeHtml(a.name),
+      cls: used.has(a.id) ? "used" : s.bal.done.has(a.stat) ? "" : "need",
       sub: mini ? `+${MINI_XP}XP` : a.maxPerDay === 1 ? `1日 ${a.xpPerUnit}XP` : `1${a.unit} ${a.xpPerUnit}XP`,
       onClick: () => (mini ? act({ activity: a.id, amount: 0, mini: true }) : amountMenu(a)),
     })),
@@ -219,9 +227,16 @@ async function act(log) {
   }
   floatText(avatar, `+${gain}XP`, "xp");
   await sleep(500);
-  if (gain > xpForLog(log)) await say("とりかえしボーナス！ 経験値が 2倍！");
+  const newlyBalanced = !before.bal.balanced && after.bal.balanced;
+  if (gain - (newlyBalanced ? BALANCE_BONUS : 0) > xpForLog(log)) await say("とりかえしボーナス！ 経験値が 2倍！");
   if (dmg > 0) await say(`${before.boss.name}に ${dmg}の ダメージ！`);
 
+  if (newlyBalanced) {
+    burst(innerWidth / 2, innerHeight / 3, ["🌈", "✨", "⭐", "💫"], 24, 160);
+    await say(`4つの能力が そろった！ バランスボーナス +${BALANCE_BONUS}XP！`, { wait: 400 });
+    banner("パーフェクトデイ！", `4つの能力を ぜんぶ きたえた +${BALANCE_BONUS}XP`, "🌈");
+    await sleep(2600);
+  }
   if (before.hp > 0 && after.hp === 0) {
     pulse(enemy, "defeated");
     await say(`${before.boss.name}を たおした！`, { wait: 400 });
