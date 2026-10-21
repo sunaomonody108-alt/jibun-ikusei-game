@@ -28,3 +28,16 @@ jobs:
           path: .
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Check the live site serves this commit
+        run: |
+          url="${{ steps.deployment.outputs.page_url }}"
+          for i in $(seq 1 20); do
+            if curl -fsS -H 'Cache-Control: no-cache' "${url}fx.js" -o /dev/null \
+              && curl -fsS -H 'Cache-Control: no-cache' "${url}index.html" | grep -q "$(grep -o 'id="version">[^<]*' index.html)"; then
+              echo "Live site is up to date: ${url}"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Live site did not update in time" >&2
+          exit 1
