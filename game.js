@@ -24,6 +24,13 @@ export const STATS = [
 export const MISSED_DAY_PENALTY = 20; // 記録ゼロの日1日あたり
 export const PENALTY_CAP_RATE = 0.2; // 今週稼いだ経験値の最大20%まで
 export const BOSS_HP = 300; // 週ボスの体力
+export const BOSS_POWERUP = 0.1; // 倒せなかった週ごとに、次の週のボスHP +10%
+export const BOSS_POWERUP_MAX = 3; // 強化は3段階（+30%）まで
+
+// 倒せずに持ち越した回数から、今週のボスHPを決める
+export function bossHp(streak) {
+  return Math.round(BOSS_HP * (1 + BOSS_POWERUP * Math.min(streak, BOSS_POWERUP_MAX)));
+}
 
 export function activityById(id) {
   return ACTIVITIES.find((a) => a.id === id);
@@ -66,7 +73,7 @@ export function weekStart(key) {
 // 1週間分の結果を計算する。
 // - 記録ゼロで終わった日はペナルティ（ただし今週稼いだ分の20%まで）
 // - ペナルティを受けた後の行動は、受けた分を取り戻すまで経験値2倍
-export function weekSummary(logs, startKey, todayKey) {
+export function weekSummary(logs, startKey, todayKey, hp = BOSS_HP) {
   const days = [];
   let gross = 0;
   let rawPenalty = 0;
@@ -102,7 +109,7 @@ export function weekSummary(logs, startKey, todayKey) {
   const bonus = Math.min(recovered, penalty);
   const net = gross + bonus - penalty;
   const debtLeft = Math.max(0, penalty - bonus);
-  return { startKey, days, gross, penalty, bonus, net, debtLeft, stats, bossDefeated: net >= BOSS_HP };
+  return { startKey, days, gross, penalty, bonus, net, debtLeft, stats, bossHp: hp, bossDefeated: net >= hp };
 }
 
 // レベルn→n+1 に必要な経験値は 50×n
@@ -119,6 +126,7 @@ export function levelFromXp(xp) {
 }
 
 // 全期間の集計。過去の週の結果は確定し、レベルは絶対に下がらない
+// 倒せなかったボスは次の週も残り、少しずつ強くなる（streak = 持ち越した回数）
 export function overall(logs, todayKey) {
   const thisWeek = weekStart(todayKey);
   const first = logs.length ? logs.map((l) => l.date).sort()[0] : todayKey;
@@ -126,15 +134,19 @@ export function overall(logs, todayKey) {
   let total = 0;
   const stats = Object.fromEntries(STATS.map((s) => [s.id, 0]));
   let bossesDefeated = 0;
+  let streak = 0;
   let current = null;
   while (start <= thisWeek) {
     const end = start === thisWeek ? todayKey : addDays(start, 7);
-    const w = weekSummary(logs, start, end);
+    const w = weekSummary(logs, start, end, bossHp(streak));
     total += w.net;
     for (const s of STATS) stats[s.id] += w.stats[s.id];
-    if (start !== thisWeek && w.bossDefeated) bossesDefeated += 1;
     if (start === thisWeek) current = w;
+    else if (w.bossDefeated) {
+      bossesDefeated += 1;
+      streak = 0;
+    } else streak += 1;
     start = addDays(start, 7);
   }
-  return { total, stats, bossesDefeated, week: current };
+  return { total, stats, bossesDefeated, streak, week: current };
 }

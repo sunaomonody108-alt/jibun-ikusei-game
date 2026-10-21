@@ -1,19 +1,12 @@
 import {
-  ACTIVITIES, STATS, MINI_XP, BOSS_HP, activityById, xpForLog,
+  ACTIVITIES, STATS, MINI_XP, activityById, xpForLog,
   dateKey, overall, levelFromXp,
 } from "./game.js";
+import { PROLOGUE, BOSSES, chapterOf, fragmentQuestion } from "./story.js";
 import { floatText, pulse, burst, banner, countTo } from "./fx.js";
 
 const STORE_KEY = "jibun-game-v1";
 const AVATARS = ["🧑", "🧑‍🎓", "🏃", "🧙", "🦸"]; // レベルで見た目が変わる
-// 週ごとに入れかわる「怠けのモンスター」
-const BOSSES = [
-  { name: "ダラダラスライム", icon: "👾" },
-  { name: "アトマワシ", icon: "🐌" },
-  { name: "ヨフカシバット", icon: "🦇" },
-  { name: "スマホドラゴン", icon: "🐉" },
-  { name: "ナマケオニ", icon: "👹" },
-];
 const QUICK = { reading: [10, 20, 50], study: [1, 2, 3], running: [15, 30, 45], cooking: [1, 2, 3] };
 
 function load() {
@@ -89,9 +82,10 @@ function render() {
   }).join("");
 
   const boss = bossOf(o);
-  const hp = Math.max(0, BOSS_HP - w.net);
-  const ratio = hp / BOSS_HP;
-  $("bossname").textContent = boss.name;
+  const hp = Math.max(0, w.bossHp - w.net);
+  const ratio = hp / w.bossHp;
+  // 持ち越して強くなったボスには★が付く
+  $("bossname").textContent = boss.name + "★".repeat(Math.min(o.streak, 3));
   $("bosslv").textContent = o.bossesDefeated + 1;
   $("bossicon").textContent = boss.icon;
   $("bossicon").classList.toggle("fainted", hp === 0);
@@ -100,7 +94,9 @@ function render() {
   bar.className = "hp-fill " + (ratio > 0.5 ? "high" : ratio > 0.2 ? "mid" : "low");
 
   const todayDone = state.logs.some((l) => l.date === today);
-  return { level: shownLevel, hp, net: w.net, done: todayDone, w, o, boss };
+  // 取りもどした記憶のかけらの数（今週のボスを倒していれば、その分も入る）
+  const fragments = o.bossesDefeated + (hp === 0 ? 1 : 0);
+  return { level: shownLevel, hp, net: w.net, done: todayDone, w, o, boss, fragments };
 }
 
 function idleText(s) {
@@ -228,6 +224,7 @@ async function act(log) {
     await say(`${before.boss.name}を たおした！`, { wait: 400 });
     banner("ボス撃破！", "今週のボスに勝ちました", "🏆");
     await sleep(2600);
+    await say(`記憶のかけら #${after.fragments}を 取りもどした！`);
   }
   if (after.level > before.level) {
     pulse(avatar, "levelup");
@@ -242,6 +239,7 @@ async function act(log) {
   $("menu").classList.remove("locked");
   busy = false;
   mainMenu();
+  if (before.hp > 0 && after.hp === 0) fragmentSheet(after.fragments - 1);
 }
 
 // ---- サブ画面 ----
@@ -276,6 +274,7 @@ function statusSheet() {
         return `<li><span>${a.name}${l.mini ? "（2分）" : a.maxPerDay === 1 ? "" : ` ${l.amount}${a.unit}`}</span><span>+${xpForLog(l)}</span><button type="button" class="link" data-del="${l.id}">取消</button></li>`;
       }).join("") : "<li>まだありません</li>"}
     </ul>
+    <button type="button" class="cmd wide" id="openstory">ものがたり・記憶のかけら（${s.fragments}）</button>
     <button type="button" class="cmd wide" id="openreport">週報を見る・送る</button>
     <button type="button" class="link" id="rename">名前を変える</button>
   `);
@@ -286,6 +285,7 @@ function statusSheet() {
       statusSheet();
     };
   });
+  $("openstory").onclick = storySheet;
   $("openreport").onclick = reportSheet;
   $("rename").onclick = () => {
     const n = prompt("分身の名前", state.name);
@@ -361,6 +361,53 @@ function rewardSheet() {
   };
 }
 
+// ---- ものがたり ----
+// ボスを倒すと「未来の自分」の記憶のかけらが1つもどる。中身は自分への問い
+
+function answers() {
+  if (!state.answers) state.answers = {};
+  return state.answers;
+}
+
+function fragmentSheet(i) {
+  openSheet(`
+    <h2>記憶のかけら #${i + 1}</h2>
+    <p class="question">${fragmentQuestion(i)}</p>
+    <textarea id="answer" rows="4" maxlength="300" placeholder="思いついたことを ひとことでOK">${escapeHtml(answers()[i] ?? "")}</textarea>
+    <button type="button" class="cmd wide" id="saveanswer">記憶に きざむ</button>
+    <p class="small">答えは あとから 書いても、書きかえても かまいません。</p>
+  `);
+  $("saveanswer").onclick = () => {
+    const t = $("answer").value.trim();
+    if (t) answers()[i] = t;
+    else delete answers()[i];
+    save();
+    storySheet();
+  };
+}
+
+function storySheet() {
+  const s = render();
+  const c = chapterOf(s.o.bossesDefeated);
+  const items = Array.from({ length: s.fragments }, (_, i) => {
+    const a = answers()[i];
+    return `<li><span>#${i + 1} ${fragmentQuestion(i)}<br><span class="${a ? "ans" : "small"}">${a ? escapeHtml(a) : "（まだ答えていない）"}</span></span><button type="button" class="link" data-frag="${i}">書く</button></li>`;
+  });
+  openSheet(`
+    <h2>第${c.no}章「${c.title}」</h2>
+    <p class="small">${c.text}</p>
+    <p class="small">いまの敵: ${s.boss.name}（${s.boss.line}）</p>
+    <h2>記憶のかけら（${s.fragments}）</h2>
+    <ul class="logs story">${items.length ? items.join("") : "<li>まだありません。今週のボスを たおすと 1つ もどります。</li>"}</ul>
+    <button type="button" class="link" id="prologue">はじまりの話を 読む</button>
+    <p class="small" id="prologuetext" hidden>${PROLOGUE.join("<br>")}</p>
+  `);
+  $("sheetbody").querySelectorAll("[data-frag]").forEach((b) => {
+    b.onclick = () => fragmentSheet(Number(b.dataset.frag));
+  });
+  $("prologue").onclick = () => ($("prologuetext").hidden = false);
+}
+
 function reportText(s) {
   const today = todayKey();
   const doneDays = s.w.days.filter((d) => d.done).length;
@@ -375,6 +422,7 @@ function reportText(s) {
     `Lv.${s.level}｜今週 ${s.w.net}XP｜記録した日 ${doneDays}/${s.w.days.length}日`,
     ...byAct,
     s.hp === 0 ? `${s.boss.name}を撃破！` : `${s.boss.name} 残りHP ${s.hp}`,
+    `第${chapterOf(s.o.bossesDefeated).no}章｜記憶のかけら ${s.fragments}個`,
   ].join("\n");
 }
 
@@ -402,7 +450,26 @@ function reportSheet() {
 async function intro() {
   busy = true;
   const s = render();
+  // はじめて開いたときだけ、はじまりの話
+  if (!state.seenPrologue) {
+    for (const line of PROLOGUE) await say(line, { wait: 900 });
+    state.seenPrologue = true;
+    save();
+  }
+  // 新しい章に入ったら、章の話を1回だけ
+  const c = chapterOf(s.o.bossesDefeated);
+  if ((state.seenChapter ?? 1) < c.no) {
+    await say(`第${c.no}章「${c.title}」`, { wait: 500 });
+    await say(c.text);
+    state.seenChapter = c.no;
+    save();
+  }
   await say(`あ！ やせいの ${s.boss.name}が あらわれた！`, { wait: 500 });
+  if (s.o.streak > 0 && s.hp > 0) {
+    await say(`${s.boss.name}は 先週から 居すわり、パワーアップした！（HP ${s.w.bossHp}）`);
+  } else if (s.hp > 0) {
+    await say(`${s.boss.name}は ${s.boss.line}`);
+  }
   if (s.w.penalty > 0 && s.w.debtLeft > 0) {
     await say(`記録のない日が あった… 経験値が ${s.w.penalty} へった！`);
   }

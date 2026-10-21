@@ -32,7 +32,7 @@ jobs:
         run: |
           url="${{ steps.deployment.outputs.page_url }}"
           for i in $(seq 1 20); do
-            if curl -fsS -H 'Cache-Control: no-cache' "${url}fx.js" -o /dev/null \
+            if curl -fsS -H 'Cache-Control: no-cache' "${url}story.js" -o /dev/null \
               && curl -fsS -H 'Cache-Control: no-cache' "${url}index.html" | grep -q "$(grep -o 'id="version">[^<]*' index.html)"; then
               echo "Live site is up to date: ${url}"
               exit 0
