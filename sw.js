@@ -1,5 +1,5 @@
 // オフラインでも開けるように、ファイルをキャッシュする
-const CACHE = "jibun-game-v2";
+const CACHE = "jibun-game-v3";
 const FILES = ["./", "index.html", "app.js", "game.js", "fx.js", "style.css", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (e) => {
@@ -17,7 +17,8 @@ self.addEventListener("activate", (e) => {
 // 新しい版を優先し、つながらないときだけキャッシュを使う
 self.addEventListener("fetch", (e) => {
   e.respondWith(
-    fetch(e.request)
+    // ブラウザのHTTPキャッシュ（GitHub Pagesは最大10分）を通さず、毎回サーバーに確認する
+    fetch(e.request, { cache: "no-cache" })
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));
