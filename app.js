@@ -2,11 +2,19 @@ import {
   ACTIVITIES, STATS, MINI_XP, BOSS_HP, activityById, xpForLog,
   dateKey, overall, levelFromXp,
 } from "./game.js";
-import { floatText, pulse, attack, banner, countTo } from "./fx.js";
+import { floatText, pulse, burst, banner, countTo } from "./fx.js";
 
 const STORE_KEY = "jibun-game-v1";
 const AVATARS = ["🧑", "🧑‍🎓", "🏃", "🧙", "🦸"]; // レベルで見た目が変わる
-const BOSSES = ["👾", "🐉", "🦑", "🤖", "👹"];
+// 週ごとに入れかわる「怠けのモンスター」
+const BOSSES = [
+  { name: "ダラダラスライム", icon: "👾" },
+  { name: "アトマワシ", icon: "🐌" },
+  { name: "ヨフカシバット", icon: "🦇" },
+  { name: "スマホドラゴン", icon: "🐉" },
+  { name: "ナマケオニ", icon: "👹" },
+];
+const QUICK = { reading: [10, 20, 50], study: [1, 2, 3], running: [15, 30, 45], cooking: [1, 2, 3] };
 
 function load() {
   try {
@@ -23,84 +31,38 @@ function save() {
 }
 
 const state = load();
-let selected = ACTIVITIES[0].id;
 const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let busy = false;
 
 function todayKey() {
   return dateKey(new Date());
 }
 
-function addLog(log) {
-  const before = render();
-  state.logs.push({ ...log, id: Date.now() + Math.random(), date: todayKey() });
-  save();
-  const after = render();
-  celebrate(before, after);
+function bossOf(o) {
+  return BOSSES[o.bossesDefeated % BOSSES.length];
 }
 
-// 記録したときの演出
-function celebrate(before, after) {
-  const gain = after.net - before.net;
-  const avatar = $("avatar");
-  pulse(avatar, "jump");
-  floatText(avatar, `+${gain}XP`, "xp");
-  const dmg = before.hp - after.hp;
-  if (dmg > 0) {
-    attack(avatar, $("bossicon"), () => {
-      pulse($("bossicon"), after.hp === 0 ? "defeated" : "hit");
-      floatText($("bossicon"), `-${dmg}`, "dmg");
-    });
+// ---- メッセージ欄（1文字ずつ表示） ----
+
+async function say(text, { wait = 700 } = {}) {
+  const el = $("msg");
+  el.textContent = "";
+  $("next").hidden = true;
+  for (const ch of text) {
+    el.textContent += ch;
+    await sleep(22);
   }
-  // 重なったときは順番に見せる
-  const queue = [];
-  if (!before.done && after.done) queue.push(["今日の最低ライン達成", "この調子でいこう", "🔥"]);
-  if (after.level > before.level) queue.push(["LEVEL UP!", `Lv.${before.level} → Lv.${after.level}`, avatar.textContent]);
-  if (before.hp > 0 && after.hp === 0) queue.push(["ボス撃破！", "今週のボスに勝ちました", "🏆"]);
-  queue.forEach((args, i) => setTimeout(() => banner(...args), 900 + i * 2900));
+  $("next").hidden = false;
+  await sleep(wait);
 }
 
-function removeLog(id) {
-  state.logs = state.logs.filter((l) => l.id !== id);
-  save();
-  render();
+function sayNow(text) {
+  $("msg").textContent = text;
+  $("next").hidden = true;
 }
 
-function toast(text) {
-  const t = $("toast");
-  t.textContent = text;
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (t.textContent = ""), 2500);
-}
-
-function renderActivities() {
-  const box = $("activities");
-  box.innerHTML = "";
-  for (const a of ACTIVITIES) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "chip" + (a.id === selected ? " on" : "");
-    b.textContent = a.name;
-    b.onclick = () => {
-      selected = a.id;
-      renderActivities();
-      renderForm();
-    };
-    box.appendChild(b);
-  }
-}
-
-function renderForm() {
-  const a = activityById(selected);
-  $("unit").textContent = `${a.unit}（1${a.unit}=${a.xpPerUnit}XP）`;
-  const once = a.maxPerDay === 1;
-  $("amount").hidden = once;
-  $("amount").value = once ? "1" : "";
-  const sel = $("multiplier");
-  sel.hidden = !a.multipliers;
-  sel.innerHTML = (a.multipliers || [])
-    .map((m) => `<option value="${m.id}">${m.name} ×${m.value}</option>`)
-    .join("");
-}
+// ---- 画面の更新 ----
 
 function render() {
   const today = todayKey();
@@ -117,137 +79,274 @@ function render() {
   $("avatar").textContent = AVATARS[Math.min(AVATARS.length - 1, Math.floor((shownLevel - 1) / 5))];
   const pct = shownLevel > lv.level ? 0 : Math.round((lv.into / lv.need) * 100);
   $("xpbar").style.width = pct + "%";
-  $("xptext").textContent = shownLevel > lv.level
-    ? "今週の取り返し中（レベルは下がりません）"
-    : `次のレベルまで ${lv.need - lv.into} XP`;
+  $("xptext").textContent = shownLevel > lv.level ? "とりかえし中" : `つぎのLvまで ${lv.need - lv.into}`;
 
-  // 今日と今週
-  const todayDone = state.logs.some((l) => l.date === today);
-  $("today").innerHTML = todayDone
-    ? `<span class="ok">✔ 今日の最低ラインは達成</span>`
-    : `<span class="warn">まだ0件です。2分だけでもOK</span>`;
   const names = ["月", "火", "水", "木", "金", "土", "日"];
   $("week").innerHTML = names.map((n, i) => {
     const d = w.days[i];
     const cls = !d ? "future" : d.done ? "done" : d.missed ? "missed" : "pending";
-    return `<div class="day ${cls}"><div>${n}</div><div class="dot"></div></div>`;
+    return `<span class="day ${cls}" title="${n}"></span>`;
   }).join("");
 
-  // ボス
+  const boss = bossOf(o);
   const hp = Math.max(0, BOSS_HP - w.net);
-  const weekIndex = o.bossesDefeated;
-  $("bossicon").textContent = BOSSES[weekIndex % BOSSES.length];
-  $("bossbar").style.width = Math.round((hp / BOSS_HP) * 100) + "%";
-  let bossText = hp === 0 ? "撃破！ 今週はもう勝っています" : `残りHP ${hp} / ${BOSS_HP}（今週の経験値でダメージ）`;
-  if (w.penalty > 0) bossText += w.debtLeft > 0 ? `｜ペナルティ -${w.penalty}` : `｜ペナルティ -${w.penalty}（取り返し済み）`;
-  if (w.debtLeft > 0) bossText += `｜取り返し中: 次の行動は2倍（あと${w.debtLeft}）`;
-  $("bosstext").textContent = bossText;
+  const ratio = hp / BOSS_HP;
+  $("bossname").textContent = boss.name;
+  $("bosslv").textContent = o.bossesDefeated + 1;
+  $("bossicon").textContent = boss.icon;
+  $("bossicon").classList.toggle("fainted", hp === 0);
+  const bar = $("bosshp");
+  bar.style.width = Math.round(ratio * 100) + "%";
+  bar.className = "hp-fill " + (ratio > 0.5 ? "high" : ratio > 0.2 ? "mid" : "low");
 
-  // 能力
-  const maxStat = Math.max(50, ...STATS.map((s) => o.stats[s.id]));
-  if (!$("stats").children.length) {
-    $("stats").innerHTML = STATS.map((s) => `
-      <div class="stat" id="stat-${s.id}">
-        <span>${s.name}</span>
-        <div class="bar"><div class="fill"></div></div>
-        <span class="num"></span>
-      </div>`).join("");
-  }
-  // 要素を作り直さずに値だけ変え、バーが伸びるようにする
-  for (const s of STATS) {
-    const row = $(`stat-${s.id}`);
-    row.querySelector(".fill").style.width = Math.round((o.stats[s.id] / maxStat) * 100) + "%";
-    countTo(row.querySelector(".num"), o.stats[s.id]);
-  }
-
-  // 今日の記録
-  const todayLogs = state.logs.filter((l) => l.date === today);
-  $("logs").innerHTML = todayLogs.length ? "" : `<li class="small">まだありません</li>`;
-  for (const l of todayLogs) {
-    const a = activityById(l.activity);
-    const li = document.createElement("li");
-    li.innerHTML = `<span>${a.name}${l.mini ? "（2分）" : ` ${l.amount}${a.unit}`}</span><span>+${xpForLog(l)}XP</span>`;
-    const del = document.createElement("button");
-    del.className = "link";
-    del.textContent = "取消";
-    del.onclick = () => removeLog(l.id);
-    li.appendChild(del);
-    $("logs").appendChild(li);
-  }
-
-  // 週のまとめ（彼女への報告用）
-  const doneDays = w.days.filter((d) => d.done).length;
-  const byAct = ACTIVITIES.map((a) => {
-    const n = state.logs.filter((l) => l.date >= w.startKey && l.date <= today && l.activity === a.id && !l.mini)
-      .reduce((s, l) => s + l.amount, 0);
-    return n ? `・${a.name} ${n}${a.unit}` : null;
-  }).filter(Boolean);
-  $("summary").textContent = [
-    `【${state.name}の週報】${w.startKey}〜`,
-    `Lv.${shownLevel}｜今週 ${w.net}XP｜記録した日 ${doneDays}/${w.days.length}日`,
-    ...byAct,
-    hp === 0 ? "ボス撃破！" : `ボス残りHP ${hp}`,
-  ].join("\n");
-
-  return { level: shownLevel, hp, net: w.net, done: todayDone };
+  const todayDone = state.logs.some((l) => l.date === today);
+  return { level: shownLevel, hp, net: w.net, done: todayDone, w, o, boss };
 }
 
-$("logform").onsubmit = (e) => {
-  e.preventDefault();
-  const a = activityById(selected);
-  const amount = Number($("amount").value);
-  if (!amount || amount <= 0) {
-    toast("量を入れてください");
-    return;
-  }
-  if (a.maxPerDay === 1 && state.logs.some((l) => l.date === todayKey() && l.activity === a.id && !l.mini)) {
-    toast("今日はもう記録済みです");
-    return;
-  }
-  const log = { activity: a.id, amount };
-  if (a.multipliers) log.multiplier = $("multiplier").value;
-  addLog(log);
-  toast(`${a.name} +${xpForLog(log)}XP`);
-  if (a.maxPerDay !== 1) $("amount").value = "";
-};
+function idleText(s) {
+  if (s.hp === 0) return `${s.boss.name}は たおした！ 今週は もう勝っている。`;
+  if (s.w.debtLeft > 0) return `とりかえしチャンス！ 次の行動は 2倍。（あと${s.w.debtLeft}）`;
+  if (!s.done) return `${state.name}は どうする？ （2分だけでも OK）`;
+  return `${state.name}は どうする？`;
+}
 
-$("mini").onclick = () => {
-  addLog({ activity: selected, amount: 0, mini: true });
-  toast(`${activityById(selected).name}（2分）+${MINI_XP}XP`);
-};
+// ---- コマンドメニュー ----
 
-$("share").onclick = async () => {
-  const text = $("summary").textContent;
-  try {
-    if (navigator.share) {
-      await navigator.share({ text });
+function menu(buttons) {
+  const box = $("menu");
+  box.innerHTML = "";
+  box.className = "menu" + (buttons.length > 4 ? " many" : "");
+  for (const b of buttons) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "cmd" + (b.cls ? " " + b.cls : "");
+    el.innerHTML = b.sub ? `<span>${b.label}</span><small>${b.sub}</small>` : b.label;
+    el.onclick = () => {
+      if (!busy) b.onClick();
+    };
+    box.appendChild(el);
+  }
+}
+
+function mainMenu() {
+  sayNow(idleText(render()));
+  mainButtons();
+}
+
+function mainButtons() {
+  menu([
+    { label: "たたかう", cls: "fight", onClick: () => moveMenu(false) },
+    { label: "2分だけ", cls: "mini", onClick: () => moveMenu(true) },
+    { label: "ステータス", onClick: statusSheet },
+    { label: "週報", onClick: reportSheet },
+  ]);
+}
+
+// 行動＝わざ
+function moveMenu(mini) {
+  sayNow(mini ? "どの行動を 2分だけ やった？" : "どの わざを つかう？");
+  menu([
+    ...ACTIVITIES.map((a) => ({
+      label: a.name,
+      sub: mini ? `+${MINI_XP}XP` : a.maxPerDay === 1 ? `1日 ${a.xpPerUnit}XP` : `1${a.unit} ${a.xpPerUnit}XP`,
+      onClick: () => (mini ? act({ activity: a.id, amount: 0, mini: true }) : amountMenu(a)),
+    })),
+    { label: "もどる", cls: "back", onClick: mainMenu },
+  ]);
+}
+
+function amountMenu(a) {
+  if (a.maxPerDay === 1) {
+    if (state.logs.some((l) => l.date === todayKey() && l.activity === a.id && !l.mini)) {
+      sayNow(`${a.name}は 今日は もう つかった！`);
       return;
     }
-  } catch {}
-  try {
-    await navigator.clipboard.writeText(text);
-    toast("コピーしました");
-  } catch {
-    toast("コピーできませんでした");
+    act({ activity: a.id, amount: 1 });
+    return;
   }
+  let multiplier = a.multipliers?.[0].id;
+  const draw = () => {
+    sayNow(`${a.name}： どれだけ やった？（${a.unit}）`);
+    menu([
+      ...QUICK[a.id].map((n) => ({
+        label: `${n}${a.unit}`,
+        onClick: () => act({ activity: a.id, amount: n, multiplier }),
+      })),
+      { label: "数を入力", onClick: () => {
+        const n = Number(prompt(`${a.name}は 何${a.unit}？`, ""));
+        if (n > 0) act({ activity: a.id, amount: Math.round(n), multiplier });
+      } },
+      ...(a.multipliers ? [{
+        label: a.multipliers.find((m) => m.id === multiplier).name,
+        sub: "タップで切りかえ",
+        onClick: () => {
+          const i = a.multipliers.findIndex((m) => m.id === multiplier);
+          multiplier = a.multipliers[(i + 1) % a.multipliers.length].id;
+          draw();
+        },
+      }] : []),
+      { label: "もどる", cls: "back", onClick: () => moveMenu(false) },
+    ]);
+  };
+  draw();
+}
+
+// ---- わざを使う（記録して戦闘演出） ----
+
+async function act(log) {
+  busy = true;
+  mainButtons();
+  $("menu").classList.add("locked");
+  const before = render();
+  state.logs.push({ ...log, id: Date.now() + Math.random(), date: todayKey() });
+  save();
+  const a = activityById(log.activity);
+  const what = log.mini ? `${a.name}を 2分だけ やった` : a.maxPerDay === 1 ? a.name : `${a.name} ${log.amount}${a.unit}`;
+  await say(`${state.name}の ${what}！`, { wait: 200 });
+
+  // 自分が前に出て、ボスが点滅する
+  const avatar = $("avatar");
+  const enemy = $("bossicon");
+  pulse(avatar, "lunge");
+  await sleep(280);
+  const after = render();
+  const dmg = before.hp - after.hp;
+  const gain = after.net - before.net;
+  if (dmg > 0) {
+    pulse(enemy, "hit");
+    const r = enemy.getBoundingClientRect();
+    burst(r.left + r.width / 2, r.top + r.height / 2, ["💥", "✦", "⭐"], 8, 60);
+    floatText(enemy, `-${dmg}`, "dmg");
+  }
+  floatText(avatar, `+${gain}XP`, "xp");
+  await sleep(500);
+  if (gain > xpForLog(log)) await say("とりかえしボーナス！ 経験値が 2倍！");
+  if (dmg > 0) await say(`${before.boss.name}に ${dmg}の ダメージ！`);
+
+  if (before.hp > 0 && after.hp === 0) {
+    pulse(enemy, "defeated");
+    await say(`${before.boss.name}を たおした！`, { wait: 400 });
+    banner("ボス撃破！", "今週のボスに勝ちました", "🏆");
+    await sleep(2600);
+  }
+  if (after.level > before.level) {
+    pulse(avatar, "levelup");
+    await say(`${state.name}は レベル${after.level}に あがった！`, { wait: 400 });
+    banner("LEVEL UP!", `Lv.${before.level} → Lv.${after.level}`, avatar.textContent);
+    await sleep(2600);
+  }
+  if (!before.done && after.done) await say("今日の 最低ラインを 達成した！");
+
+  $("menu").classList.remove("locked");
+  busy = false;
+  mainMenu();
+}
+
+// ---- サブ画面 ----
+
+function openSheet(html) {
+  $("sheetbody").innerHTML = html;
+  $("sheet").hidden = false;
+}
+
+$("sheetclose").onclick = () => {
+  $("sheet").hidden = true;
+  mainMenu();
 };
 
-$("rename").onclick = () => {
-  const n = prompt("分身の名前", state.name);
-  if (n) {
-    state.name = n.trim().slice(0, 20) || state.name;
-    save();
-    render();
-  }
-};
+function statusSheet() {
+  const s = render();
+  const today = todayKey();
+  const maxStat = Math.max(50, ...STATS.map((x) => s.o.stats[x.id]));
+  const logs = state.logs.filter((l) => l.date === today);
+  openSheet(`
+    <h2>${state.name}　Lv${s.level}</h2>
+    ${STATS.map((x) => `
+      <div class="stat">
+        <span>${x.name}</span>
+        <div class="hp-track"><div class="hp-fill stat-fill" style="width:${Math.round((s.o.stats[x.id] / maxStat) * 100)}%"></div></div>
+        <span class="num">${s.o.stats[x.id]}</span>
+      </div>`).join("")}
+    <h2>今日の記録</h2>
+    <ul class="logs">
+      ${logs.length ? logs.map((l) => {
+        const a = activityById(l.activity);
+        return `<li><span>${a.name}${l.mini ? "（2分）" : a.maxPerDay === 1 ? "" : ` ${l.amount}${a.unit}`}</span><span>+${xpForLog(l)}</span><button type="button" class="link" data-del="${l.id}">取消</button></li>`;
+      }).join("") : "<li>まだありません</li>"}
+    </ul>
+    <button type="button" class="link" id="rename">名前を変える</button>
+  `);
+  $("sheetbody").querySelectorAll("[data-del]").forEach((b) => {
+    b.onclick = () => {
+      state.logs = state.logs.filter((l) => String(l.id) !== b.dataset.del);
+      save();
+      statusSheet();
+    };
+  });
+  $("rename").onclick = () => {
+    const n = prompt("分身の名前", state.name);
+    if (n && n.trim()) {
+      state.name = n.trim().slice(0, 12);
+      save();
+      statusSheet();
+    }
+  };
+}
 
-renderActivities();
-renderForm();
-render();
+function reportText(s) {
+  const today = todayKey();
+  const doneDays = s.w.days.filter((d) => d.done).length;
+  const byAct = ACTIVITIES.map((a) => {
+    const n = state.logs
+      .filter((l) => l.date >= s.w.startKey && l.date <= today && l.activity === a.id && !l.mini)
+      .reduce((sum, l) => sum + l.amount, 0);
+    return n ? `・${a.name} ${n}${a.unit}` : null;
+  }).filter(Boolean);
+  return [
+    `【${state.name}の週報】${s.w.startKey}〜`,
+    `Lv.${s.level}｜今週 ${s.w.net}XP｜記録した日 ${doneDays}/${s.w.days.length}日`,
+    ...byAct,
+    s.hp === 0 ? `${s.boss.name}を撃破！` : `${s.boss.name} 残りHP ${s.hp}`,
+  ].join("\n");
+}
+
+function reportSheet() {
+  const text = reportText(render());
+  openSheet(`<h2>週報</h2><pre class="summary">${text}</pre><button type="button" class="cmd wide" id="share">送る・コピー</button><p class="small" id="sharemsg"></p>`);
+  $("share").onclick = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ text });
+        return;
+      }
+    } catch {}
+    try {
+      await navigator.clipboard.writeText(text);
+      $("sharemsg").textContent = "コピーしました";
+    } catch {
+      $("sharemsg").textContent = "コピーできませんでした";
+    }
+  };
+}
+
+// ---- 起動 ----
+
+async function intro() {
+  busy = true;
+  const s = render();
+  await say(`あ！ やせいの ${s.boss.name}が あらわれた！`, { wait: 500 });
+  if (s.w.penalty > 0 && s.w.debtLeft > 0) {
+    await say(`記録のない日が あった… 経験値が ${s.w.penalty} へった！`);
+  }
+  busy = false;
+  mainMenu();
+}
+
+intro();
 
 // 日付が変わったら描き直す
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) render();
+  if (!document.hidden && !busy && $("sheet").hidden) mainMenu();
 });
 
 if ("serviceWorker" in navigator) {

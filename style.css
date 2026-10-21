@@ -1,148 +1,212 @@
 :root {
-  --bg: #f4f5f8;
-  --card: #ffffff;
-  --text: #1c2333;
-  --muted: #6b7385;
-  --accent: #3b6cf6;
-  --ok: #1f9d55;
-  --warn: #d9822b;
-  --bad: #d64545;
-  --track: #e3e6ee;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #12151d;
-    --card: #1c212c;
-    --text: #e8ebf2;
-    --muted: #9aa3b5;
-    --accent: #6b8fff;
-    --track: #2b3240;
-  }
+  --ink: #2a2a35;
+  --paper: #f8f8f0;
+  --frame: #20283a;
+  --sky-top: #dff3ff;
+  --sky-bottom: #f5fbe8;
+  --grass: #b9e08f;
+  --grass-dark: #8cc46a;
+  --hp-high: #3fc25b;
+  --hp-mid: #f2c12e;
+  --hp-low: #e8473f;
+  --exp: #3b8cf6;
+  --track: #5a5a68;
+  --accent: #e8473f;
 }
 * { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
 body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  background: var(--frame);
+  color: var(--ink);
+  font-family: "DotGothic16", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
-main {
+.console {
   max-width: 480px;
   margin: 0 auto;
-  padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+  min-height: 100%;
+  padding: calc(10px + env(safe-area-inset-top)) 10px calc(14px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.card {
-  background: var(--card);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
+
+/* ---- 戦闘フィールド ---- */
+.field {
+  position: relative;
+  height: 330px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 4px solid #0e1320;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom) 60%);
 }
-h2 { font-size: 15px; margin: 0 0 10px; color: var(--muted); font-weight: 600; }
-.small { font-size: 12px; color: var(--muted); }
-.hero { display: flex; gap: 14px; align-items: center; }
-.avatar { font-size: 56px; line-height: 1; }
-.hero-text { flex: 1; }
-.name { font-weight: 700; }
-.level { font-size: 22px; font-weight: 800; margin: 2px 0 6px; }
-.bar { height: 10px; background: var(--track); border-radius: 99px; overflow: hidden; flex: 1; }
-.fill { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
-.boss-bar .fill { background: var(--bad); }
-.ok { color: var(--ok); font-weight: 600; }
-.warn { color: var(--warn); font-weight: 600; }
-.week { display: flex; justify-content: space-between; margin-top: 12px; }
-.day { text-align: center; font-size: 12px; color: var(--muted); }
-.dot { width: 22px; height: 22px; border-radius: 50%; margin: 4px auto 0; background: var(--track); }
-.day.done .dot { background: var(--ok); }
-.day.missed .dot { background: var(--bad); opacity: .6; }
-.day.pending .dot { outline: 2px solid var(--accent); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.chip {
-  border: 1px solid var(--track); background: transparent; color: var(--text);
-  padding: 8px 12px; border-radius: 99px; font-size: 14px;
+.ground {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, var(--grass) 55%, var(--grass-dark) 56%, var(--grass-dark) 70%, transparent 71%);
 }
-.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
-input, select {
-  font-size: 16px; padding: 8px 10px; border-radius: 8px;
-  border: 1px solid var(--track); background: var(--bg); color: var(--text);
+.enemy-ground { width: 190px; height: 50px; right: 12px; top: 128px; }
+.player-ground { width: 210px; height: 56px; left: 0; bottom: 64px; }
+.sprite { position: absolute; line-height: 1; user-select: none; }
+.enemy { font-size: 78px; right: 58px; top: 64px; animation: float 2s ease-in-out infinite; }
+.player { font-size: 92px; left: 46px; bottom: 82px; transform: scaleX(-1); animation: breathe 2.4s ease-in-out infinite; }
+
+.plate {
+  position: absolute;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 8px 8px 8px 2px;
+  padding: 6px 10px 7px;
+  box-shadow: 4px 4px 0 rgba(0,0,0,.18);
+  min-width: 190px;
 }
-input { width: 90px; }
-button {
-  font-size: 15px; padding: 10px 14px; border-radius: 10px;
-  border: 1px solid var(--track); background: var(--bg); color: var(--text);
+.enemy-plate { left: 10px; top: 12px; }
+.player-plate { right: 10px; bottom: 10px; border-radius: 8px 8px 2px 8px; min-width: 210px; }
+.plate-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 16px; }
+.lv { font-size: 14px; }
+.hp-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.hp-label {
+  font-size: 10px; font-weight: 700; color: #f3c64b; background: var(--ink);
+  padding: 1px 4px; border-radius: 3px; min-width: 28px; text-align: center;
 }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
-button.link { border: none; background: none; color: var(--accent); padding: 4px; font-size: 13px; }
-.toast { min-height: 18px; font-size: 14px; color: var(--ok); font-weight: 600; }
-.boss { display: flex; gap: 12px; align-items: center; }
-.boss-icon { font-size: 40px; }
-.boss-body { flex: 1; }
-.stat { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 14px; }
-.stat > span:first-child { width: 52px; }
-.stat .num { width: 44px; text-align: right; color: var(--muted); }
-.logs { list-style: none; padding: 0; margin: 0; }
-.logs li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--track); font-size: 14px; }
+.hp-track {
+  flex: 1; height: 9px; background: var(--track); border-radius: 5px;
+  border: 2px solid var(--ink); overflow: hidden;
+}
+.hp-fill { height: 100%; width: 100%; transition: width 1s steps(24), background-color .3s; }
+.hp-fill.high { background: var(--hp-high); }
+.hp-fill.mid { background: var(--hp-mid); }
+.hp-fill.low { background: var(--hp-low); }
+.exp-fill { background: var(--exp); }
+.plate-num { text-align: right; font-size: 12px; margin-top: 3px; color: #555; }
+.week { display: flex; gap: 4px; margin-top: 5px; }
+.day { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); background: #ddd; }
+.day.done { background: var(--hp-high); }
+.day.missed { background: var(--hp-low); }
+.day.pending { background: #fff; animation: blink 1s steps(2) infinite; }
+.day.future { opacity: .35; }
+
+/* ---- メッセージ欄 ---- */
+.msgbox {
+  position: relative;
+  background: var(--paper);
+  border: 4px double var(--ink);
+  outline: 3px solid #0e1320;
+  border-radius: 8px;
+  min-height: 84px;
+  padding: 12px 16px;
+  font-size: 17px;
+  line-height: 1.6;
+}
+.msgbox p { margin: 0; }
+.next { position: absolute; right: 12px; bottom: 6px; font-size: 12px; animation: blink .8s steps(2) infinite; }
+
+/* ---- コマンド ---- */
+.menu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: var(--paper);
+  border: 4px solid var(--ink);
+  outline: 3px solid #0e1320;
+  border-radius: 8px;
+  padding: 10px;
+}
+.menu.locked { opacity: .55; pointer-events: none; }
+.cmd {
+  font: inherit;
+  font-size: 17px;
+  color: var(--ink);
+  background: #fff;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  padding: 12px 10px 12px 26px;
+  text-align: left;
+  position: relative;
+  box-shadow: 0 3px 0 var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cmd small { font-size: 11px; color: #666; }
+.cmd::before { content: "▶"; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: 0; }
+.cmd:hover::before, .cmd:focus-visible::before { opacity: 1; }
+.cmd:active { transform: translateY(3px); box-shadow: 0 0 0 var(--ink); }
+.cmd.fight { background: #ffe1df; }
+.cmd.mini { background: #fff3cc; }
+.cmd.back { background: #e9e9ef; }
+.cmd.wide { width: 100%; text-align: center; padding-left: 10px; }
+
+/* ---- サブ画面 ---- */
+.sheet { position: fixed; inset: 0; background: rgba(14, 19, 32, .7); display: grid; place-items: center; z-index: 20; padding: 16px; }
+.sheet[hidden] { display: none; }
+.sheet-box {
+  background: var(--paper); border: 4px double var(--ink); outline: 3px solid #0e1320;
+  border-radius: 10px; width: 100%; max-width: 440px; max-height: 86vh; overflow: auto; padding: 14px 16px;
+}
+.sheet-box h2 { font-size: 17px; margin: 4px 0 10px; font-weight: normal; border-bottom: 2px dashed var(--ink); padding-bottom: 4px; }
+.stat { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.stat > span:first-child { width: 56px; }
+.stat .num { width: 44px; text-align: right; }
+.stat-fill { background: var(--exp); }
+.logs { list-style: none; margin: 0 0 12px; padding: 0; }
+.logs li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dotted #999; font-size: 15px; }
 .logs li span:first-child { flex: 1; }
-.summary {
-  white-space: pre-wrap; font-family: inherit; font-size: 13px;
-  background: var(--bg); padding: 10px; border-radius: 8px; margin: 0 0 10px;
-}
-footer { text-align: center; padding: 8px 0; }
+.link { font: inherit; font-size: 14px; border: none; background: none; color: var(--exp); padding: 4px; }
+.summary { white-space: pre-wrap; font: inherit; font-size: 14px; background: #fff; border: 2px solid var(--ink); border-radius: 6px; padding: 10px; }
+.small { font-size: 13px; color: #555; }
+.foot { text-align: center; font-size: 11px; color: #8a93a8; }
 
-/* ---- 演出 ---- */
-.avatar { animation: idle 2.4s ease-in-out infinite; display: inline-block; }
-.avatar.jump { animation: jump .6s cubic-bezier(.3,1.6,.5,1); }
-.boss-icon { display: inline-block; animation: hover 1.8s ease-in-out infinite; }
-.boss-icon.hit { animation: hit .45s ease; }
-.boss-icon.defeated { animation: defeated 1s ease forwards; }
-@keyframes idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
-@keyframes hover { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-5px) rotate(3deg); } }
-@keyframes jump {
-  0% { transform: translateY(0) scale(1); }
-  30% { transform: translateY(-22px) scale(1.15, .9); }
-  60% { transform: translateY(0) scale(.9, 1.1); }
-  100% { transform: translateY(0) scale(1); }
+/* ---- 動き ---- */
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes breathe { 0%, 100% { transform: scaleX(-1) translateY(0); } 50% { transform: scaleX(-1) translateY(-3px); } }
+@keyframes blink { 50% { opacity: 0; } }
+.player.lunge { animation: lunge .55s ease; }
+@keyframes lunge {
+  0% { transform: scaleX(-1) translate(0, 0); }
+  35% { transform: scaleX(-1) translate(-60px, -30px) rotate(-8deg); }
+  100% { transform: scaleX(-1) translate(0, 0); }
 }
+.enemy.hit { animation: hit .6s steps(1); }
 @keyframes hit {
-  0%, 100% { transform: translateX(0); filter: none; }
-  20% { transform: translateX(-8px) rotate(-8deg); filter: brightness(2) saturate(0); }
-  40% { transform: translateX(8px) rotate(8deg); }
-  60% { transform: translateX(-5px); filter: brightness(2) saturate(0); }
-  80% { transform: translateX(4px); }
+  0%, 40%, 80% { opacity: 0; }
+  20%, 60%, 100% { opacity: 1; }
 }
-@keyframes defeated {
-  0% { transform: scale(1); }
-  30% { transform: scale(1.4) rotate(-10deg); filter: brightness(3); }
-  100% { transform: scale(0) rotate(360deg); opacity: 0; }
+.enemy.defeated { animation: faint .9s ease-in forwards; }
+@keyframes faint { to { transform: translateY(40px); opacity: 0; } }
+.enemy.fainted { opacity: .2; filter: grayscale(1); animation: none; }
+.player.levelup { animation: levelup 1s ease; }
+@keyframes levelup {
+  0%, 100% { transform: scaleX(-1); filter: none; }
+  25% { transform: scaleX(-1) translateY(-14px); filter: brightness(1.6) drop-shadow(0 0 12px #f6c23b); }
+  50% { transform: scaleX(-1); }
+  75% { transform: scaleX(-1) translateY(-8px); filter: brightness(1.4) drop-shadow(0 0 10px #f6c23b); }
 }
-.fill { transition: width .8s cubic-bezier(.2,.8,.3,1); }
-.day.done .dot { animation: pop .4s ease; }
-@keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
+/* ---- 演出レイヤー（fx.js） ---- */
 #fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
-.fx-float { position: fixed; font-weight: 900; font-size: 22px; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.fx-float { position: fixed; font-size: 22px; white-space: nowrap; text-shadow: 2px 2px 0 var(--ink); }
 .fx-float.xp { color: #f6c23b; }
-.fx-float.dmg { color: var(--bad); font-size: 26px; }
-.fx-shot, .fx-particle { position: fixed; font-size: 28px; }
-.fx-particle { font-size: 18px; }
+.fx-float.dmg { color: #fff; font-size: 28px; text-shadow: 2px 2px 0 var(--hp-low), -2px -2px 0 var(--hp-low); }
+.fx-shot, .fx-particle { position: fixed; font-size: 18px; }
 .fx-confetti { position: fixed; top: 0; width: 8px; height: 12px; border-radius: 2px; }
-.fx-banner {
-  position: fixed; inset: 0; display: grid; place-items: center; pointer-events: auto;
-  background: rgba(10, 14, 25, .55); animation: fade .25s ease;
-}
+.fx-banner { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: auto; background: rgba(10, 14, 25, .55); animation: fade .25s ease; }
 .fx-banner.out { opacity: 0; transition: opacity .3s; }
 .fx-banner-box {
-  background: var(--card); border-radius: 20px; padding: 24px 32px; text-align: center;
-  animation: zoom .5s cubic-bezier(.3,1.6,.5,1); box-shadow: 0 10px 40px rgba(0,0,0,.3);
+  background: var(--paper); border: 4px double var(--ink); outline: 3px solid #0e1320;
+  border-radius: 12px; padding: 22px 32px; text-align: center; animation: zoom .5s cubic-bezier(.3,1.6,.5,1);
 }
 .fx-banner-icon { font-size: 64px; animation: spin 1s ease; }
-.fx-banner-title { font-size: 28px; font-weight: 900; color: var(--accent); margin-top: 6px; }
-.fx-banner-sub { color: var(--muted); margin-top: 4px; }
+.fx-banner-title { font-size: 28px; color: var(--accent); margin-top: 6px; }
+.fx-banner-sub { color: #555; margin-top: 4px; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes zoom { from { transform: scale(.3); opacity: 0; } }
 @keyframes spin { from { transform: rotate(-360deg) scale(.3); } }
 
+@media (max-width: 360px) {
+  .enemy-plate, .player-plate { min-width: 0; width: 60%; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .avatar, .boss-icon { animation: none; }
+  .enemy, .player, .day.pending, .next { animation: none; }
 }
