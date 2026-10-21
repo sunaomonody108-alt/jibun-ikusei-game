@@ -1,5 +1,5 @@
 import {
-  ACTIVITIES, STATS, MINI_XP, activityById, xpForLog,
+  STATS, KINDS, MINI_XP, activityById, allActivities, setCustomActivities, xpForLog,
   dateKey, overall, levelFromXp,
 } from "./game.js";
 import { PROLOGUE, BOSSES, chapterOf, fragmentQuestion } from "./story.js";
@@ -24,6 +24,8 @@ function save() {
 }
 
 const state = load();
+if (!state.activities) state.activities = [];
+setCustomActivities(state.activities);
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let busy = false;
@@ -142,11 +144,12 @@ function mainButtons() {
 function moveMenu(mini) {
   sayNow(mini ? "どの行動を 2分だけ やった？" : "どの わざを つかう？");
   menu([
-    ...ACTIVITIES.map((a) => ({
-      label: a.name,
+    ...allActivities().map((a) => ({
+      label: escapeHtml(a.name),
       sub: mini ? `+${MINI_XP}XP` : a.maxPerDay === 1 ? `1日 ${a.xpPerUnit}XP` : `1${a.unit} ${a.xpPerUnit}XP`,
       onClick: () => (mini ? act({ activity: a.id, amount: 0, mini: true }) : amountMenu(a)),
     })),
+    ...(mini ? [] : [{ label: "＋ 行動を追加", cls: "add", onClick: activitySheet }]),
     { label: "もどる", cls: "back", onClick: mainMenu },
   ]);
 }
@@ -164,7 +167,7 @@ function amountMenu(a) {
   const draw = () => {
     sayNow(`${a.name}： どれだけ やった？（${a.unit}）`);
     menu([
-      ...QUICK[a.id].map((n) => ({
+      ...(a.quick ?? QUICK[a.id]).map((n) => ({
         label: `${n}${a.unit}`,
         onClick: () => act({ activity: a.id, amount: n, multiplier }),
       })),
@@ -271,7 +274,7 @@ function statusSheet() {
     <ul class="logs">
       ${logs.length ? logs.map((l) => {
         const a = activityById(l.activity);
-        return `<li><span>${a.name}${l.mini ? "（2分）" : a.maxPerDay === 1 ? "" : ` ${l.amount}${a.unit}`}</span><span>+${xpForLog(l)}</span><button type="button" class="link" data-del="${l.id}">取消</button></li>`;
+        return `<li><span>${escapeHtml(a.name)}${l.mini ? "（2分）" : a.maxPerDay === 1 ? "" : ` ${l.amount}${a.unit}`}</span><span>+${xpForLog(l)}</span><button type="button" class="link" data-del="${l.id}">取消</button></li>`;
       }).join("") : "<li>まだありません</li>"}
     </ul>
     <button type="button" class="cmd wide" id="openstory">ものがたり・記憶のかけら（${s.fragments}）</button>
@@ -361,6 +364,66 @@ function rewardSheet() {
   };
 }
 
+// ---- 行動（わざ）の追加・削除 ----
+// 経験値は自由に決めず「時間・回数・1日1回」の型から選ぶ
+
+function activitySheet() {
+  let kind = KINDS[0].id;
+  let stat = STATS[0].id;
+  const mine = state.activities.filter((a) => !a.hidden);
+  const draw = () => {
+    const k = KINDS.find((x) => x.id === kind);
+    openSheet(`
+      <h2>行動（わざ）を追加</h2>
+      <div class="addrow"><input id="aname" maxlength="12" placeholder="${k.example.split("、")[0]}"></div>
+      <p class="small">記録のしかた</p>
+      <div class="choices">${KINDS.map((x) => `<button type="button" class="chip${x.id === kind ? " on" : ""}" data-kind="${x.id}">${x.name}<small>${x.maxPerDay ? `1日 ${x.xpPerUnit}XP` : `1${x.unit} ${x.xpPerUnit}XP`}</small></button>`).join("")}</div>
+      <p class="small">${k.example}</p>
+      <p class="small">きたえる能力</p>
+      <div class="choices">${STATS.map((x) => `<button type="button" class="chip${x.id === stat ? " on" : ""}" data-stat="${x.id}">${x.name}</button>`).join("")}</div>
+      <button type="button" class="cmd wide" id="aadd">この わざを おぼえる</button>
+      <p class="small" id="amsg"></p>
+      <h2>追加した行動</h2>
+      <ul class="logs">${mine.length ? mine.map((a) => {
+        const x = KINDS.find((y) => y.id === a.kind);
+        return `<li><span>${escapeHtml(a.name)}</span><span class="small">${x.name}・${STATS.find((y) => y.id === a.stat).name}</span><button type="button" class="link" data-forget="${a.id}">削除</button></li>`;
+      }).join("") : "<li>まだありません</li>"}</ul>
+      <p class="small">削除しても、これまでの記録と経験値は消えません。</p>
+    `);
+    const body = $("sheetbody");
+    const name = $("aname");
+    const keep = () => name.value;
+    body.querySelectorAll("[data-kind]").forEach((b) => {
+      b.onclick = () => { const v = keep(); kind = b.dataset.kind; draw(); $("aname").value = v; };
+    });
+    body.querySelectorAll("[data-stat]").forEach((b) => {
+      b.onclick = () => { const v = keep(); stat = b.dataset.stat; draw(); $("aname").value = v; };
+    });
+    body.querySelectorAll("[data-forget]").forEach((b) => {
+      b.onclick = () => {
+        const a = state.activities.find((x) => x.id === b.dataset.forget);
+        if (!confirm(`「${a.name}」を わざから 外しますか？`)) return;
+        a.hidden = true;
+        setCustomActivities(state.activities);
+        save();
+        activitySheet();
+      };
+    });
+    $("aadd").onclick = () => {
+      const n = name.value.trim();
+      if (!n) return ($("amsg").textContent = "行動の名前を入れてください");
+      if (allActivities().some((a) => a.name === n)) return ($("amsg").textContent = "同じ名前の行動が もうあります");
+      state.activities.push({ id: "c" + Date.now(), name: n, kind, stat });
+      setCustomActivities(state.activities);
+      save();
+      $("sheet").hidden = true;
+      moveMenu(false);
+      sayNow(`${state.name}は あたらしい わざ「${n}」を おぼえた！`);
+    };
+  };
+  draw();
+}
+
 // ---- ものがたり ----
 // ボスを倒すと「未来の自分」の記憶のかけらが1つもどる。中身は自分への問い
 
@@ -411,10 +474,9 @@ function storySheet() {
 function reportText(s) {
   const today = todayKey();
   const doneDays = s.w.days.filter((d) => d.done).length;
-  const byAct = ACTIVITIES.map((a) => {
-    const n = state.logs
-      .filter((l) => l.date >= s.w.startKey && l.date <= today && l.activity === a.id && !l.mini)
-      .reduce((sum, l) => sum + l.amount, 0);
+  const weekLogs = state.logs.filter((l) => l.date >= s.w.startKey && l.date <= today && !l.mini);
+  const byAct = [...new Set(weekLogs.map((l) => l.activity))].map(activityById).map((a) => {
+    const n = weekLogs.filter((l) => l.activity === a.id).reduce((sum, l) => sum + l.amount, 0);
     return n ? `・${a.name} ${n}${a.unit}` : null;
   }).filter(Boolean);
   return [
@@ -428,7 +490,7 @@ function reportText(s) {
 
 function reportSheet() {
   const text = reportText(render());
-  openSheet(`<h2>週報</h2><pre class="summary">${text}</pre><button type="button" class="cmd wide" id="share">送る・コピー</button><p class="small" id="sharemsg"></p>`);
+  openSheet(`<h2>週報</h2><pre class="summary">${escapeHtml(text)}</pre><button type="button" class="cmd wide" id="share">送る・コピー</button><p class="small" id="sharemsg"></p>`);
   $("share").onclick = async () => {
     try {
       if (navigator.share) {

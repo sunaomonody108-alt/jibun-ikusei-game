@@ -240,3 +240,15 @@ body {
 }
 .logs.story li { align-items: flex-start; line-height: 1.5; }
 .logs.story .ans { color: var(--exp); }
+
+/* ---- 行動の追加 ---- */
+.cmd.add { background: #dfeeff; }
+.addrow #aname { flex: 1; }
+.choices { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.chip {
+  font: inherit; font-size: 14px; color: var(--ink); background: #fff; border: 2px solid var(--ink); border-radius: 6px;
+  padding: 6px 10px; display: flex; flex-direction: column; align-items: center;
+}
+.chip small { font-size: 11px; color: #666; }
+.chip.on { background: var(--ink); color: #f3c64b; }
+.chip.on small { color: #ddd; }
