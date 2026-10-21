@@ -232,3 +232,11 @@ body {
 .addrow .cmd { padding: 8px 12px; }
 .addrow .cmd::before { display: none; }
 .sheet-box .cmd.wide { margin: 6px 0 10px; }
+
+/* ---- ものがたり ---- */
+.question { font-size: 17px; line-height: 1.6; margin: 4px 0 10px; }
+#answer {
+  font: inherit; font-size: 16px; width: 100%; padding: 8px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; resize: vertical;
+}
+.logs.story li { align-items: flex-start; line-height: 1.5; }
+.logs.story .ans { color: var(--exp); }
