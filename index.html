@@ -3,79 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1f2a44">
+  <meta name="theme-color" content="#20283a">
   <title>自分育成ゲーム</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <section class="card hero">
-      <div class="avatar" id="avatar">🧑</div>
-      <div class="hero-text">
-        <div class="name" id="name">あなたの分身</div>
-        <div class="level">Lv.<span id="level">1</span></div>
-        <div class="bar"><div class="fill" id="xpbar"></div></div>
-        <div class="small" id="xptext"></div>
+  <main class="console">
+    <!-- 戦闘画面 -->
+    <section class="field" id="field">
+      <div class="plate enemy-plate">
+        <div class="plate-top">
+          <span id="bossname">ダラダラスライム</span>
+          <span class="lv">Lv<span id="bosslv">1</span></span>
+        </div>
+        <div class="hp-row">
+          <span class="hp-label">HP</span>
+          <div class="hp-track"><div class="hp-fill" id="bosshp"></div></div>
+        </div>
+      </div>
+      <div class="ground enemy-ground"></div>
+      <div class="sprite enemy" id="bossicon">👾</div>
+
+      <div class="ground player-ground"></div>
+      <div class="sprite player" id="avatar">🧑</div>
+      <div class="plate player-plate">
+        <div class="plate-top">
+          <span id="name">あなたの分身</span>
+          <span class="lv">Lv<span id="level">1</span></span>
+        </div>
+        <div class="week" id="week"></div>
+        <div class="hp-row">
+          <span class="hp-label">EXP</span>
+          <div class="hp-track exp"><div class="hp-fill exp-fill" id="xpbar"></div></div>
+        </div>
+        <div class="plate-num" id="xptext"></div>
       </div>
     </section>
 
-    <section class="card">
-      <h2>今日</h2>
-      <div class="today" id="today"></div>
-      <div class="week" id="week"></div>
+    <!-- メッセージ欄 -->
+    <section class="msgbox" id="msgbox">
+      <p id="msg"></p>
+      <span class="next" id="next">▼</span>
     </section>
 
-    <section class="card">
-      <h2>記録する</h2>
-      <form id="logform">
-        <div class="chips" id="activities"></div>
-        <div class="row" id="amountrow">
-          <input id="amount" type="number" inputmode="numeric" min="1" placeholder="量">
-          <span id="unit"></span>
-          <select id="multiplier" hidden></select>
-        </div>
-        <div class="row">
-          <button type="submit" class="primary">記録する</button>
-          <button type="button" id="mini">2分だけやった（+5）</button>
-        </div>
-        <div class="toast" id="toast" aria-live="polite"></div>
-      </form>
-    </section>
+    <!-- コマンド -->
+    <section class="menu" id="menu"></section>
 
-    <section class="card">
-      <h2>今週のボス</h2>
-      <div class="boss">
-        <div class="boss-icon" id="bossicon">👾</div>
-        <div class="boss-body">
-          <div class="bar boss-bar"><div class="fill" id="bossbar"></div></div>
-          <div class="small" id="bosstext"></div>
-        </div>
+    <!-- サブ画面（ステータス・週報） -->
+    <section class="sheet" id="sheet" hidden>
+      <div class="sheet-box">
+        <div class="sheet-body" id="sheetbody"></div>
+        <button type="button" class="cmd wide" id="sheetclose">もどる</button>
       </div>
     </section>
 
-    <section class="card">
-      <h2>能力</h2>
-      <div id="stats"></div>
-    </section>
-
-    <section class="card">
-      <h2>今日の記録</h2>
-      <ul class="logs" id="logs"></ul>
-    </section>
-
-    <section class="card">
-      <h2>週のまとめ</h2>
-      <pre class="summary" id="summary"></pre>
-      <button type="button" id="share">まとめを送る・コピー</button>
-    </section>
-
-    <footer class="small">
-      データはこの端末の中だけに保存されます。 <span id="version">v3</span>
-      <button type="button" id="rename" class="link">名前を変える</button>
-    </footer>
+    <footer class="foot">データはこの端末の中だけに保存されます。 <span id="version">v4</span></footer>
   </main>
   <script type="module" src="app.js"></script>
 </body>

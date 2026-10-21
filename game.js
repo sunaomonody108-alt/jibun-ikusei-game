@@ -86,7 +86,7 @@ export function weekSummary(logs, startKey, todayKey) {
       recovered += bonus;
       gross += base;
       dayXp += base + bonus;
-      stats[activityById(log.activity).stat] += base + bonus;
+      stats[activityById(log.activity).stat] += base;
     }
     const finished = key < todayKey;
     const missed = finished && dayLogs.length === 0;
