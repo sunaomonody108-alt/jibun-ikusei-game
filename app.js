@@ -137,8 +137,8 @@ function mainButtons() {
   menu([
     { label: "たたかう", cls: "fight", onClick: () => moveMenu(false) },
     { label: "2分だけ", cls: "mini", onClick: () => moveMenu(true) },
+    { label: "ごほうび", cls: "reward", onClick: rewardSheet },
     { label: "ステータス", onClick: statusSheet },
-    { label: "週報", onClick: reportSheet },
   ]);
 }
 
@@ -234,6 +234,8 @@ async function act(log) {
     await say(`${state.name}は レベル${after.level}に あがった！`, { wait: 400 });
     banner("LEVEL UP!", `Lv.${before.level} → Lv.${after.level}`, avatar.textContent);
     await sleep(2600);
+    const unlocked = rewards().filter((r) => !r.used && r.level > before.level && r.level <= after.level);
+    for (const r of unlocked) await say(`ごほうび「${r.name}」が 解放された！`);
   }
   if (!before.done && after.done) await say("今日の 最低ラインを 達成した！");
 
@@ -274,6 +276,7 @@ function statusSheet() {
         return `<li><span>${a.name}${l.mini ? "（2分）" : a.maxPerDay === 1 ? "" : ` ${l.amount}${a.unit}`}</span><span>+${xpForLog(l)}</span><button type="button" class="link" data-del="${l.id}">取消</button></li>`;
       }).join("") : "<li>まだありません</li>"}
     </ul>
+    <button type="button" class="cmd wide" id="openreport">週報を見る・送る</button>
     <button type="button" class="link" id="rename">名前を変える</button>
   `);
   $("sheetbody").querySelectorAll("[data-del]").forEach((b) => {
@@ -283,6 +286,7 @@ function statusSheet() {
       statusSheet();
     };
   });
+  $("openreport").onclick = reportSheet;
   $("rename").onclick = () => {
     const n = prompt("分身の名前", state.name);
     if (n && n.trim()) {
@@ -290,6 +294,70 @@ function statusSheet() {
       save();
       statusSheet();
     }
+  };
+}
+
+// ---- ごほうびショップ ----
+// 自分で決めた現実のごほうびを、決めたレベルで解放する
+
+function rewards() {
+  if (!state.rewards) state.rewards = [];
+  return state.rewards;
+}
+
+function escapeHtml(t) {
+  return t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+function rewardSheet() {
+  const s = render();
+  const list = [...rewards()].sort((a, b) => a.used - b.used || a.level - b.level);
+  const row = (r) => {
+    const open = s.level >= r.level;
+    const status = r.used ? `<span class="tag used">使った</span>`
+      : open ? `<button type="button" class="cmd use" data-use="${r.id}">つかう</button>`
+      : `<span class="tag lock">🔒 あと${r.level - s.level}Lv</span>`;
+    return `<li class="${r.used ? "is-used" : open ? "is-open" : ""}"><span class="rlv">Lv${r.level}</span><span class="rname">${escapeHtml(r.name)}</span>${status}<button type="button" class="link" data-rm="${r.id}">削除</button></li>`;
+  };
+  openSheet(`
+    <h2>ごほうびショップ　（いま Lv${s.level}）</h2>
+    <p class="small">現実のごほうびと、解放するレベルを自分で決めます。レベルが届いたら使えます。</p>
+    <ul class="logs rewards">${list.length ? list.map(row).join("") : "<li>まだありません。下から追加してください。</li>"}</ul>
+    <h2>ごほうびを追加</h2>
+    <div class="addrow">
+      <input id="rname" maxlength="30" placeholder="例: 欲しかった本を買う">
+      <input id="rlevel" type="number" inputmode="numeric" min="2" value="${s.level + 2}">
+      <button type="button" class="cmd" id="radd">追加</button>
+    </div>
+    <p class="small" id="rmsg"></p>
+  `);
+  const body = $("sheetbody");
+  body.querySelectorAll("[data-use]").forEach((b) => {
+    b.onclick = () => {
+      const r = rewards().find((x) => x.id === b.dataset.use);
+      if (!confirm(`「${r.name}」を使いますか？`)) return;
+      r.used = true;
+      r.usedAt = todayKey();
+      save();
+      banner("ごほうび！", r.name, "🎁");
+      rewardSheet();
+    };
+  });
+  body.querySelectorAll("[data-rm]").forEach((b) => {
+    b.onclick = () => {
+      state.rewards = rewards().filter((x) => x.id !== b.dataset.rm);
+      save();
+      rewardSheet();
+    };
+  });
+  $("radd").onclick = () => {
+    const name = $("rname").value.trim();
+    const level = Math.round(Number($("rlevel").value));
+    if (!name) return ($("rmsg").textContent = "ごほうびの名前を入れてください");
+    if (!(level > s.level)) return ($("rmsg").textContent = `今のレベル（Lv${s.level}）より上にしてください`);
+    rewards().push({ id: String(Date.now()), name, level, used: false });
+    save();
+    rewardSheet();
   };
 }
 

@@ -210,3 +210,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .enemy, .player, .day.pending, .next { animation: none; }
 }
+
+/* ---- ごほうびショップ ---- */
+.cmd.reward { background: #e3f4dc; }
+.rewards li { gap: 6px; }
+.logs.rewards li .rlv { flex: none; font-size: 12px; background: var(--ink); color: #f3c64b; padding: 1px 5px; border-radius: 3px; }
+.rewards .rname { flex: 1; }
+.rewards li.is-open .rname { font-weight: bold; }
+.rewards li.is-used .rname { text-decoration: line-through; color: #888; }
+.tag { font-size: 12px; white-space: nowrap; }
+.tag.lock { color: #777; }
+.tag.used { color: #888; }
+.cmd.use { padding: 6px 10px; font-size: 14px; background: #fff3cc; box-shadow: 0 2px 0 var(--ink); }
+.cmd.use::before { display: none; }
+.addrow { display: flex; gap: 6px; margin-bottom: 6px; }
+.addrow input {
+  font: inherit; font-size: 16px; padding: 8px; border: 2px solid var(--ink); border-radius: 6px; background: #fff; min-width: 0;
+}
+.addrow #rname { flex: 1; }
+.addrow #rlevel { width: 64px; }
+.addrow .cmd { padding: 8px 12px; }
+.addrow .cmd::before { display: none; }
+.sheet-box .cmd.wide { margin: 6px 0 10px; }
