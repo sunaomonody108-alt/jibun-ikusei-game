@@ -214,7 +214,7 @@ body {
 /* ---- ごほうびショップ ---- */
 .cmd.reward { background: #e3f4dc; }
 .rewards li { gap: 6px; }
-.rewards li .rlv { flex: none; font-size: 12px; background: var(--ink); color: #f3c64b; padding: 1px 5px; border-radius: 3px; }
+.logs.rewards li .rlv { flex: none; font-size: 12px; background: var(--ink); color: #f3c64b; padding: 1px 5px; border-radius: 3px; }
 .rewards .rname { flex: 1; }
 .rewards li.is-open .rname { font-weight: bold; }
 .rewards li.is-used .rname { text-decoration: line-through; color: #888; }
