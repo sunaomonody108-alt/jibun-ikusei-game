@@ -32,8 +32,32 @@ export function bossHp(streak) {
   return Math.round(BOSS_HP * (1 + BOSS_POWERUP * Math.min(streak, BOSS_POWERUP_MAX)));
 }
 
+// 自分で追加する行動は、経験値を自由に決めず「型」から選ぶ（点数の水増しを防ぐ）
+export const KINDS = [
+  { id: "time", name: "時間", unit: "分", xpPerUnit: 1, quick: [10, 20, 30], example: "例: 筋トレ、英語のリスニング" },
+  { id: "count", name: "回数", unit: "回", xpPerUnit: 15, quick: [1, 2, 3], example: "例: 掃除、日記を書く" },
+  { id: "daily", name: "1日1回", unit: "日", xpPerUnit: 10, maxPerDay: 1, example: "例: 早起き、お酒を飲まなかった" },
+];
+
+// 追加した行動（削除したものも、過去の記録のために hidden で残す）
+let custom = [];
+
+export function customActivity({ id, name, kind, stat, hidden = false }) {
+  const k = KINDS.find((x) => x.id === kind);
+  return { id, name, kind, stat, hidden, custom: true, unit: k.unit, xpPerUnit: k.xpPerUnit, maxPerDay: k.maxPerDay, quick: k.quick };
+}
+
+export function setCustomActivities(list) {
+  custom = list.map(customActivity);
+}
+
+// 画面に出す行動（削除したものは出さない）
+export function allActivities() {
+  return [...ACTIVITIES, ...custom.filter((a) => !a.hidden)];
+}
+
 export function activityById(id) {
-  return ACTIVITIES.find((a) => a.id === id);
+  return ACTIVITIES.find((a) => a.id === id) ?? custom.find((a) => a.id === id);
 }
 
 export function xpForLog(log) {

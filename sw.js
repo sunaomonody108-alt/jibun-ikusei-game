@@ -1,5 +1,5 @@
 // オフラインでも開けるように、ファイルをキャッシュする
-const CACHE = "jibun-game-v6";
+const CACHE = "jibun-game-v7";
 const FILES = ["./", "index.html", "app.js", "game.js", "fx.js", "style.css", "story.js", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (e) => {
