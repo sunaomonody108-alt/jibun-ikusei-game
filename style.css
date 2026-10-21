@@ -252,3 +252,19 @@ body {
 .chip small { font-size: 11px; color: #666; }
 .chip.on { background: var(--ink); color: #f3c64b; }
 .chip.on small { color: #ddd; }
+
+/* ---- まんべんなくボーナス ---- */
+.balance { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.bal {
+  text-align: center; font-size: 13px; padding: 4px 0; border-radius: 6px;
+  background: #2c3550; color: #8a93a8; border: 2px solid #0e1320;
+}
+.bal.on { background: var(--paper); color: var(--ink); }
+.bal.on::before { content: "✓ "; color: var(--hp-high); }
+.balance.all .bal { background: linear-gradient(90deg, #ffe08a, #ffd1f0, #c9f0ff); animation: shine 2s ease-in-out infinite; }
+@keyframes shine { 50% { filter: brightness(1.15); } }
+.day.balanced { background: #f6c23b; }
+.cmd.used { background: #eef7ea; }
+.cmd.used span { color: #3c7a3a; }
+.cmd.need { border-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .balance.all .bal { animation: none; } }

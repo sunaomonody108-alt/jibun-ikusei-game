@@ -21,6 +21,16 @@ export const STATS = [
   { id: "will", name: "意志力" },
 ];
 
+// 1日のうちに4つの能力すべてをきたえたら（2分だけは数えない）もらえるボーナス
+export const BALANCE_BONUS = 30;
+
+// その日にきたえた能力と、まだの能力
+export function dayBalance(dayLogs) {
+  const done = new Set(dayLogs.filter((l) => !l.mini).map((l) => activityById(l.activity).stat));
+  const missing = STATS.filter((s) => !done.has(s.id));
+  return { done, missing, balanced: missing.length === 0 };
+}
+
 export const MISSED_DAY_PENALTY = 20; // 記録ゼロの日1日あたり
 export const PENALTY_CAP_RATE = 0.2; // 今週稼いだ経験値の最大20%まで
 export const BOSS_HP = 300; // 週ボスの体力
@@ -119,13 +129,18 @@ export function weekSummary(logs, startKey, todayKey, hp = BOSS_HP) {
       dayXp += base + bonus;
       stats[activityById(log.activity).stat] += base;
     }
+    const balanced = dayBalance(dayLogs).balanced;
+    if (balanced) {
+      gross += BALANCE_BONUS;
+      dayXp += BALANCE_BONUS;
+    }
     const finished = key < todayKey;
     const missed = finished && dayLogs.length === 0;
     if (missed) {
       rawPenalty += MISSED_DAY_PENALTY;
       debt += MISSED_DAY_PENALTY;
     }
-    days.push({ key, xp: dayXp, missed, done: dayLogs.length > 0 });
+    days.push({ key, xp: dayXp, missed, done: dayLogs.length > 0, balanced });
   }
 
   const penalty = Math.min(rawPenalty, Math.floor(gross * PENALTY_CAP_RATE));
