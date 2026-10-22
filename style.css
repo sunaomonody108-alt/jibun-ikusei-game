@@ -268,3 +268,4 @@ body {
 .cmd.used span { color: #3c7a3a; }
 .cmd.need { border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .balance.all .bal { animation: none; } }
+.addrow #rtime { flex: 1; }
