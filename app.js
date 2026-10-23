@@ -294,6 +294,7 @@ function statusSheet() {
     </ul>
     <button type="button" class="cmd wide" id="openstory">ものがたり・記憶のかけら（${s.fragments}）</button>
     <button type="button" class="cmd wide" id="openreport">週報を見る・送る</button>
+    <button type="button" class="cmd wide" id="openremind">⏰ 毎日の通知を入れる</button>
     <button type="button" class="link" id="rename">名前を変える</button>
   `);
   $("sheetbody").querySelectorAll("[data-del]").forEach((b) => {
@@ -305,6 +306,7 @@ function statusSheet() {
   });
   $("openstory").onclick = storySheet;
   $("openreport").onclick = reportSheet;
+  $("openremind").onclick = reminderSheet;
   $("rename").onclick = () => {
     const n = prompt("分身の名前", state.name);
     if (n && n.trim()) {
@@ -437,6 +439,77 @@ function activitySheet() {
     };
   };
   draw();
+}
+
+// ---- やり忘れ防止の通知 ----
+// サーバーがないので、毎日くり返す予定（.ics）をスマホのカレンダーに入れて通知してもらう
+
+function reminderIcs(time) {
+  const [h, m] = time.split(":");
+  const d = new Date();
+  const day = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+/, "");
+  const url = location.href.split("#")[0].split("?")[0];
+  return [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//jibun-ikusei-game//JA", "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:jibun-game-reminder-${h}${m}@jibun-ikusei-game`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${day}T${h}${m}00`,
+    "DURATION:PT5M",
+    "RRULE:FREQ=DAILY",
+    "SUMMARY:⚔️ 今日の1手（自分育成ゲーム）",
+    `DESCRIPTION:ボスが待っている。2分だけでもOK。\\n${url}`,
+    `URL:${url}`,
+    "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:今日の1手", "TRIGGER:PT0M", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ].map(foldLine).join("\r\n");
+}
+
+// .ics は1行75バイトまでなので、長い行は折り返す（続きの行は空白で始める）
+function foldLine(line) {
+  const enc = new TextEncoder();
+  const out = [];
+  let cur = "";
+  for (const ch of line) {
+    if (enc.encode(cur + ch).length > (out.length ? 74 : 75)) {
+      out.push(cur);
+      cur = "";
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out.join("\r\n ");
+}
+
+function reminderSheet() {
+  openSheet(`
+    <h2>⏰ 毎日の通知</h2>
+    <p class="small">毎日くり返す予定を、スマホのカレンダーに入れます。その時間になると、カレンダーが通知してくれます。</p>
+    <div class="addrow"><input id="rtime" type="time" value="${state.reminderTime ?? "21:00"}"><button type="button" class="cmd" id="rmake">カレンダーに入れる</button></div>
+    <p class="small" id="rremsg"></p>
+    <p class="small">・やった日にも通知は来ます。<br>・やめたいときは、カレンダーから予定を削除してください。<br>・時間を変えたいときは、古い予定を削除してから入れなおしてください。</p>
+  `);
+  $("rmake").onclick = async () => {
+    const time = $("rtime").value || "21:00";
+    state.reminderTime = time;
+    save();
+    const file = new File([reminderIcs(time)], "jibun-game-reminder.ics", { type: "text/calendar" });
+    try {
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "毎日の通知" });
+        $("rremsg").textContent = "カレンダーを選んで追加してください";
+        return;
+      }
+    } catch {}
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    $("rremsg").textContent = "ファイルを開いて、カレンダーに追加してください";
+  };
 }
 
 // ---- ものがたり ----
